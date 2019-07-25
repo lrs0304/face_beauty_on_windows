@@ -179,7 +179,6 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
         }
     }
 
-    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
     //并行处理
 #pragma omp parallel sections
     {
@@ -195,7 +194,6 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
     pR = rData;
     pG = gData;
     pB = bData;
-    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
 
     for (int j = 0; j < nHeight; j++)
     {

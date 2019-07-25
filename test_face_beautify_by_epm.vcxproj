@@ -74,6 +74,9 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
       <WarningLevel>Level3</WarningLevel>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <AdditionalDependencies>D:\Qt\Qt5.7.0\5.7\msvc2015\lib\qtmain.lib;shell32.lib;D:\Qt\Qt5.7.0\5.7\msvc2015\lib\Qt5Widgets.lib;D:\Qt\Qt5.7.0\5.7\msvc2015\lib\Qt5Gui.lib;D:\Qt\Qt5.7.0\5.7\msvc2015\lib\Qt5Core.lib;%(AdditionalDependencies)</AdditionalDependencies>
