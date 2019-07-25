@@ -2,12 +2,13 @@
 #include "ui_mainwindow.h"
 #include <QDebug>
 #include <QFileDialog>
-#include <time.h>
+#include <chrono>
 #include <omp.h>
 
 void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int radius);
 void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta);
 
+//参考 https://blog.csdn.net/Trent1985/article/details/80802144#commentsedit
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -48,9 +49,11 @@ void MainWindow::initWidgets()
     connect(ui->pushButton_2, &QPushButton::clicked, this, [=] {
 
         ///////////////////////////////////////////////
-        int beginClock = clock();//记录开始时间
+        auto beginClock = std::chrono::system_clock::now();
         f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.04f);
-        qDebug("cost time: %dms", clock() - beginClock);//输出图像处理花费时间信息
+        auto endClock = std::chrono::system_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endClock - beginClock);
+        qDebug("cost time: %.3lf mms", duration.count()/1000.0f);//输出图像处理花费时间信息
         ///////////////////////////////////////////////
 
         ui->output->setPixmap(QPixmap::fromImage(outImg));
@@ -58,6 +61,7 @@ void MainWindow::initWidgets()
 }
 
 //使用积分图用于快速计算均值，进而计算方差
+//参考 https://blog.csdn.net/fb_help/article/details/88534427
 void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int radius)
 {
     //sump需要比原来的多1，因为用(1,1)处的值表示(0,0)的值，(x+1,y+1)表示(0,0)~(x,y)直接的总和
@@ -150,7 +154,7 @@ int EPMFilter(unsigned char* srcData, int width, int height, int radius, float d
     return 0;
 }
 
-//4通道处理
+//3通道处理
 void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta)
 {
     Q_UNUSED(nStride);
@@ -227,8 +231,8 @@ void inline YCbCrToRGB(unsigned char Y, unsigned char Cb, unsigned char Cr, int 
     G = 1.164*(Y - 16) - 0.392*(Cb - 128) - 0.813*(Cr - 128);
     B = 1.164*(Y - 16) + 2.017*(Cb - 128);
 }
-/*
-//单通道处理
+
+//只处理Y通道
 void f_EPMFilterOneChannel(unsigned char* srcData, int nWidth, int nHeight, int nStride, int radius, float delta)
 {
     if (srcData == NULL)
@@ -278,4 +282,3 @@ void f_EPMFilterOneChannel(unsigned char* srcData, int nWidth, int nHeight, int 
         }
     }free(yData);free(cbData);free(crData);
 }
-*/
