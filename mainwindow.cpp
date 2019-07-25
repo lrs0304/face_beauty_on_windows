@@ -24,34 +24,33 @@ MainWindow::~MainWindow()
 
 void MainWindow::initWidgets()
 {
-    connect(ui->pushButton,&QPushButton::clicked, this, [=]{
+    connect(ui->pushButton, &QPushButton::clicked, this, [=] {
 
-        QFileDialog* loadFileDialog = new QFileDialog(this);
-        loadFileDialog->setWindowTitle(QString("Select An Picture"));
-        loadFileDialog->setDirectory("E:/Rison/Pictures");
-        //设置可以选择多个文件,默认为只能选择一个文件QFileDialog::ExistingFiles
-        //fileDialog->setFileMode(QFileDialog::ExistingFiles);
-        loadFileDialog->setNameFilter(tr("Images(*.png *.jpg *.jpeg *.bmp)"));
-        if(loadFileDialog->exec())
+        //QFileDialog* loadFileDialog = new QFileDialog(this);
+        //loadFileDialog->setWindowTitle(QString("Select An Picture"));
+        //loadFileDialog->setDirectory("E:/Rison/Pictures");
+        ////设置可以选择多个文件,默认为只能选择一个文件QFileDialog::ExistingFiles
+        ////fileDialog->setFileMode(QFileDialog::ExistingFiles);
+        //loadFileDialog->setNameFilter(tr("Images(*.png *.jpg *.jpeg *.bmp)"));
+        //if(loadFileDialog->exec())
         {
-            auto fileNames = loadFileDialog->selectedFiles();
-            srcImg = QImage(fileNames.first());
+            //auto fileNames = loadFileDialog->selectedFiles();
+            srcImg = QImage("E:/Rison/Pictures/ddd.png");
             outImg = srcImg.copy();
             width = srcImg.width();
             height = srcImg.height();
-            qDebug() <<"byte count " << srcImg.byteCount();
+            qDebug() << "byte count " << srcImg.byteCount();
             ui->input->setPixmap(QPixmap::fromImage(srcImg));
         }
-
-        loadFileDialog->deleteLater();
+        //loadFileDialog->deleteLater();
     });
 
-    connect(ui->pushButton_2, &QPushButton::clicked, this, [=]{
+    connect(ui->pushButton_2, &QPushButton::clicked, this, [=] {
 
         ///////////////////////////////////////////////
         int beginClock = clock();//记录开始时间
         f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.04f);
-        qDebug("cost time: %dms\n", clock() - beginClock);//输出图像处理花费时间信息
+        qDebug("cost time: %dms", clock() - beginClock);//输出图像处理花费时间信息
         ///////////////////////////////////////////////
 
         ui->output->setPixmap(QPixmap::fromImage(outImg));
@@ -113,34 +112,34 @@ void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int r
 
 unsigned char inline CLIP3(int v, int min, int max)
 {
-    if(v<min){return v;}
-    else if(v>max){return max;}
+    if (v < min) { return v; }
+    else if (v > max) { return max; }
     else return v;
 }
 
 //Edge Preserved mean filter
-int EPMFilter(unsigned char* srcData, int width ,int height, int radius, float delta)
+int EPMFilter(unsigned char* srcData, int width, int height, int radius, float delta)
 {
     float *data = (float*)malloc(sizeof(float) * width * height);
     float *meanIP = (float*)malloc(sizeof(float) * width * height);
     float *corrIP = (float*)malloc(sizeof(float) * width * height);
-    for(int i = 0; i < width * height; i++)
+    for (int i = 0; i < width * height; i++)
     {
         data[i] = (float)srcData[i] / 255.0f;
     }
     //mean and cov compute
     MeanCovMapCalculate(data, width, height, meanIP, radius);
-    for(int i = 0; i < width * height; i++)
+    for (int i = 0; i < width * height; i++)
     {
         data[i] *= data[i];
     }
     //mean and cov compute
     MeanCovMapCalculate(data, width, height, corrIP, radius);
-    for(int i = 0; i < width * height; i++)
+    for (int i = 0; i < width * height; i++)
     {
         corrIP[i] = corrIP[i] - meanIP[i] * meanIP[i];
     }
-    for(int i = 0; i < width * height; i++)
+    for (int i = 0; i < width * height; i++)
     {
         float t = meanIP[i] + (corrIP[i] * (srcData[i] / 255.0f - meanIP[i]) / (corrIP[i] + delta));
         srcData[i] = (unsigned char)(CLIP3(t * 255.0f, 0, 255));
@@ -155,22 +154,20 @@ int EPMFilter(unsigned char* srcData, int width ,int height, int radius, float d
 void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta)
 {
     Q_UNUSED(nStride);
-
     if (srcData == NULL) { return; }
 
-    //qDebug() <<"---->width:"<<nWidth<<",height:"<<nHeight;
-    uchar* rData = (uchar*)malloc(sizeof(uchar) * nWidth * nHeight);
-    uchar* gData = (uchar*)malloc(sizeof(uchar) * nWidth * nHeight);
-    uchar* bData = (uchar*)malloc(sizeof(uchar) * nWidth * nHeight);
+    int64_t rBytesCount = sizeof(uchar) * nWidth * nHeight;
+    uchar* rData = (uchar*)malloc(rBytesCount);
+    uchar* gData = (uchar*)malloc(rBytesCount);
+    uchar* bData = (uchar*)malloc(rBytesCount);
     const uchar* pSrc = srcData;
 
     uchar* pR = rData;
     uchar* pG = gData;
     uchar* pB = bData;
-    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
-    for(int y = 0; y < nHeight; y++)
+    for (int y = 0; y < nHeight; y++)
     {
-        for(int x = 0; x < nWidth; x++)
+        for (int x = 0; x < nWidth; x++)
         {
             *pR = pSrc[0];
             *pG = pSrc[1];
@@ -184,16 +181,15 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
 
     //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
     //并行处理
-    #pragma omp parallel sections
+#pragma omp parallel sections
     {
-        #pragma omp  section
-            EPMFilter(rData, nWidth, nHeight, radius, delta);
-        #pragma omp  section
-            EPMFilter(gData, nWidth, nHeight, radius, delta);
-        #pragma omp  section
-            EPMFilter(bData, nWidth, nHeight, radius, delta);
+#pragma omp section
+        EPMFilter(rData, nWidth, nHeight, radius, delta);
+#pragma omp section
+        EPMFilter(gData, nWidth, nHeight, radius, delta);
+#pragma omp section
+        EPMFilter(bData, nWidth, nHeight, radius, delta);
     }
-    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
 
     uchar* pOut = dstData;
     pR = rData;
@@ -201,9 +197,9 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
     pB = bData;
     //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
 
-    for(int j = 0; j < nHeight; j++)
+    for (int j = 0; j < nHeight; j++)
     {
-        for(int i = 0; i < nWidth; i++)
+        for (int i = 0; i < nWidth; i++)
         {
             pOut[0] = *pR;
             pOut[1] = *pG;
@@ -218,21 +214,20 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
     free(rData);
     free(gData);
     free(bData);
-    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
 }
 
-void inline RGBToYCbCr(unsigned char R,unsigned char G,unsigned char B, int &Y, int &Cb, int &Cr)
+void inline RGBToYCbCr(unsigned char R, unsigned char G, unsigned char B, int &Y, int &Cb, int &Cr)
 {
-    Y =  (unsigned char)( 0.257*R+0.564*G+0.098*B+16);
-    Cb = (unsigned char)(-0.148*R-0.291*G+0.439*B+128);
-    Cr = (unsigned char)( 0.439*R-0.368*G+0.071*B+128);
+    Y = (unsigned char)(0.257*R + 0.564*G + 0.098*B + 16);
+    Cb = (unsigned char)(-0.148*R - 0.291*G + 0.439*B + 128);
+    Cr = (unsigned char)(0.439*R - 0.368*G + 0.071*B + 128);
 }
 
-void inline YCbCrToRGB(unsigned char Y,unsigned char Cb,unsigned char Cr, int &R, int &G, int &B)
+void inline YCbCrToRGB(unsigned char Y, unsigned char Cb, unsigned char Cr, int &R, int &G, int &B)
 {
-    R = 1.164*(Y-16)+1.596*(Cr-128);
-    G = 1.164*(Y-16)-0.392*(Cb-128)-0.813*(Cr-128);
-    B = 1.164*(Y-16)+2.017*(Cb-128);
+    R = 1.164*(Y - 16) + 1.596*(Cr - 128);
+    G = 1.164*(Y - 16) - 0.392*(Cb - 128) - 0.813*(Cr - 128);
+    B = 1.164*(Y - 16) + 2.017*(Cb - 128);
 }
 /*
 //单通道处理
