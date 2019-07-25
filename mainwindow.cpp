@@ -1,8 +1,9 @@
-#include "mainwindow.h"
+ï»¿#include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QDebug>
 #include <QFileDialog>
 #include <time.h>
+#include <omp.h>
 
 void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int radius);
 void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta);
@@ -28,7 +29,7 @@ void MainWindow::initWidgets()
         QFileDialog* loadFileDialog = new QFileDialog(this);
         loadFileDialog->setWindowTitle(QString("Select An Picture"));
         loadFileDialog->setDirectory("E:/Rison/Pictures");
-        //ÉèÖÃ¿ÉÒÔÑ¡Ôñ¶à¸öÎÄ¼ş,Ä¬ÈÏÎªÖ»ÄÜÑ¡ÔñÒ»¸öÎÄ¼şQFileDialog::ExistingFiles
+        //è®¾ç½®å¯ä»¥é€‰æ‹©å¤šä¸ªæ–‡ä»¶,é»˜è®¤ä¸ºåªèƒ½é€‰æ‹©ä¸€ä¸ªæ–‡ä»¶QFileDialog::ExistingFiles
         //fileDialog->setFileMode(QFileDialog::ExistingFiles);
         loadFileDialog->setNameFilter(tr("Images(*.png *.jpg *.jpeg *.bmp)"));
         if(loadFileDialog->exec())
@@ -48,19 +49,19 @@ void MainWindow::initWidgets()
     connect(ui->pushButton_2, &QPushButton::clicked, this, [=]{
 
         ///////////////////////////////////////////////
-        int beginClock = clock();//¼ÇÂ¼¿ªÊ¼Ê±¼ä
+        int beginClock = clock();//è®°å½•å¼€å§‹æ—¶é—´
         f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.04f);
-        qDebug("cost time: %dms\n", clock() - beginClock);//Êä³öÍ¼Ïñ´¦Àí»¨·ÑÊ±¼äĞÅÏ¢
+        qDebug("cost time: %dms\n", clock() - beginClock);//è¾“å‡ºå›¾åƒå¤„ç†èŠ±è´¹æ—¶é—´ä¿¡æ¯
         ///////////////////////////////////////////////
 
         ui->output->setPixmap(QPixmap::fromImage(outImg));
     });
 }
 
-//Ê¹ÓÃ»ı·ÖÍ¼ÓÃÓÚ¿ìËÙ¼ÆËã¾ùÖµ£¬½ø¶ø¼ÆËã·½²î
+//ä½¿ç”¨ç§¯åˆ†å›¾ç”¨äºå¿«é€Ÿè®¡ç®—å‡å€¼ï¼Œè¿›è€Œè®¡ç®—æ–¹å·®
 void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int radius)
 {
-    //sumpĞèÒª±ÈÔ­À´µÄ¶à1£¬ÒòÎªÓÃ(1,1)´¦µÄÖµ±íÊ¾(0,0)µÄÖµ£¬(x+1,y+1)±íÊ¾(0,0)~(x,y)Ö±½ÓµÄ×ÜºÍ
+    //sumpéœ€è¦æ¯”åŸæ¥çš„å¤š1ï¼Œå› ä¸ºç”¨(1,1)å¤„çš„å€¼è¡¨ç¤º(0,0)çš„å€¼ï¼Œ(x+1,y+1)è¡¨ç¤º(0,0)~(x,y)ç›´æ¥çš„æ€»å’Œ
     //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__ <<" size: "<<width<<"x"<<height;
     int mapw=width+1;
     int maph=height+1;
@@ -150,7 +151,7 @@ int EPMFilter(unsigned char* srcData, int width ,int height, int radius, float d
     return 0;
 }
 
-//4Í¨µÀ´¦Àí
+//4é€šé“å¤„ç†
 void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta)
 {
     Q_UNUSED(nStride);
@@ -182,14 +183,14 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
     }
 
     //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
-    //²¢ĞĞ´¦Àí
-    //#pragma omp parallel sections  num_threads(omp_get_num_procs())
+    //å¹¶è¡Œå¤„ç†
+    #pragma omp parallel sections
     {
-    //    #pragma omp  section
+        #pragma omp  section
             EPMFilter(rData, nWidth, nHeight, radius, delta);
-    //    #pragma omp  section
+        #pragma omp  section
             EPMFilter(gData, nWidth, nHeight, radius, delta);
-    //    #pragma omp  section
+        #pragma omp  section
             EPMFilter(bData, nWidth, nHeight, radius, delta);
     }
     //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
@@ -234,7 +235,7 @@ void inline YCbCrToRGB(unsigned char Y,unsigned char Cb,unsigned char Cr, int &R
     B = 1.164*(Y-16)+2.017*(Cb-128);
 }
 /*
-//µ¥Í¨µÀ´¦Àí
+//å•é€šé“å¤„ç†
 void f_EPMFilterOneChannel(unsigned char* srcData, int nWidth, int nHeight, int nStride, int radius, float delta)
 {
     if (srcData == NULL)
