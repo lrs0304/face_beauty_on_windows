@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QImage>
 
 namespace Ui {
 class MainWindow;
@@ -18,6 +19,9 @@ public:
 private:
     void initWidgets();
     Ui::MainWindow *ui;
+    QImage srcImg;
+    QImage outImg;
+    int width, height;
 };
 
 #endif // MAINWINDOW_H

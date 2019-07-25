@@ -2,9 +2,10 @@
 #include "ui_mainwindow.h"
 #include <QDebug>
 #include <QFileDialog>
+#include <time.h>
 
 void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int radius);
-void f_EPMFilter(uchar* srcData, int nWidth, int nHeight, int nStride, int radius, float delta);
+void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta);
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -13,14 +14,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     initWidgets();
-    float *hehe = (float*)malloc(sizeof(float) * 5 * 5);
-    for(int i=0;i<5;i++)
-    {
-        for(int j=0;j<5;j++)
-        {
-            hehe[i*5+j]=1;
-        }
-    }
 }
 
 MainWindow::~MainWindow()
@@ -33,16 +26,20 @@ void MainWindow::initWidgets()
     connect(ui->pushButton,&QPushButton::clicked, this, [=]{
 
         QFileDialog* loadFileDialog = new QFileDialog(this);
-        loadFileDialog->setWindowTitle(QString("请选择图片"));
-        loadFileDialog->setDirectory("E:/Rison/Desktop");
+        loadFileDialog->setWindowTitle(QString("Select An Picture"));
+        loadFileDialog->setDirectory("E:/Rison/Pictures");
         //设置可以选择多个文件,默认为只能选择一个文件QFileDialog::ExistingFiles
         //fileDialog->setFileMode(QFileDialog::ExistingFiles);
         loadFileDialog->setNameFilter(tr("Images(*.png *.jpg *.jpeg *.bmp)"));
         if(loadFileDialog->exec())
         {
             auto fileNames = loadFileDialog->selectedFiles();
-            QPixmap pixmap(fileNames.first());
-            ui->input->setPixmap(pixmap);//(pixmap.scaled(ui->input->size(), Qt::KeepAspectRatio));
+            srcImg = QImage(fileNames.first());
+            outImg = srcImg.copy();
+            width = srcImg.width();
+            height = srcImg.height();
+            qDebug() <<"byte count " << srcImg.byteCount();
+            ui->input->setPixmap(QPixmap::fromImage(srcImg));
         }
 
         loadFileDialog->deleteLater();
@@ -50,25 +47,13 @@ void MainWindow::initWidgets()
 
     connect(ui->pushButton_2, &QPushButton::clicked, this, [=]{
 
-        QImage img=QImage("E:/Rison/Desktop/ddd.png").convertToFormat(QImage::Format_ARGB32);// = ui->input->pixmap()->toImage().convertToFormat(QImage::Format_ARGB32);
-
-
         ///////////////////////////////////////////////
-        qDebug() <<"byte count " << img.byteCount();
-        //uchar* data = (uchar*)malloc(sizeof(uchar) * img.byteCount());;
-        //for(int y=0;y<img.height();y++)
-        //{
-        //    uchar*tmp = img.scanLine(y);
-        //    memcpy(data+img.bytesPerLine()*y, tmp, img.bytesPerLine());
-        //}
-        //
-        //QImage hehe(img.bits(),img.width(),img.height(),QImage::Format_ARGB32);
+        int beginClock = clock();//记录开始时间
+        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.04f);
+        qDebug("cost time: %dms\n", clock() - beginClock);//输出图像处理花费时间信息
+        ///////////////////////////////////////////////
 
-        f_EPMFilter(img.bits(), img.width(), img.height(), img.width(), 10, 0.04f);
-        ui->output->setPixmap(QPixmap::fromImage(img));
-        //free(data);
-        //img.save("d:/rison.jpg");
-
+        ui->output->setPixmap(QPixmap::fromImage(outImg));
     });
 }
 
@@ -76,7 +61,7 @@ void MainWindow::initWidgets()
 void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int radius)
 {
     //sump需要比原来的多1，因为用(1,1)处的值表示(0,0)的值，(x+1,y+1)表示(0,0)~(x,y)直接的总和
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__ <<" size: "<<width<<"x"<<height;
+    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__ <<" size: "<<width<<"x"<<height;
     int mapw=width+1;
     int maph=height+1;
     float *summap = (float*)malloc(sizeof(float) * mapw * maph);
@@ -122,7 +107,7 @@ void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int r
 
     //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
     free(summap);
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
+    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
 }
 
 unsigned char inline CLIP3(int v, int min, int max)
@@ -166,23 +151,22 @@ int EPMFilter(unsigned char* srcData, int width ,int height, int radius, float d
 }
 
 //4通道处理
-void f_EPMFilter(uchar* srcData, int nWidth, int nHeight, int nStride, int radius, float delta)
+void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta)
 {
     Q_UNUSED(nStride);
 
     if (srcData == NULL) { return; }
 
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
+    //qDebug() <<"---->width:"<<nWidth<<",height:"<<nHeight;
     uchar* rData = (uchar*)malloc(sizeof(uchar) * nWidth * nHeight);
     uchar* gData = (uchar*)malloc(sizeof(uchar) * nWidth * nHeight);
     uchar* bData = (uchar*)malloc(sizeof(uchar) * nWidth * nHeight);
-    uchar* pSrc = srcData;
+    const uchar* pSrc = srcData;
 
-    qDebug() <<"---->width:"<<nWidth<<",height:"<<nHeight;
     uchar* pR = rData;
     uchar* pG = gData;
     uchar* pB = bData;
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
+    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
     for(int y = 0; y < nHeight; y++)
     {
         for(int x = 0; x < nWidth; x++)
@@ -197,7 +181,7 @@ void f_EPMFilter(uchar* srcData, int nWidth, int nHeight, int nStride, int radiu
         }
     }
 
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
+    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
     //并行处理
     //#pragma omp parallel sections  num_threads(omp_get_num_procs())
     {
@@ -208,35 +192,32 @@ void f_EPMFilter(uchar* srcData, int nWidth, int nHeight, int nStride, int radiu
     //    #pragma omp  section
             EPMFilter(bData, nWidth, nHeight, radius, delta);
     }
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
-    for(int i=0;i<15;i++)
-    {
-        qDebug() <<"~~~~~~"<<srcData[i*3] <<" vs " << rData[i];
-    }
-    pSrc = srcData;
+    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
+
+    uchar* pOut = dstData;
     pR = rData;
     pG = gData;
     pB = bData;
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
+    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
 
     for(int j = 0; j < nHeight; j++)
     {
         for(int i = 0; i < nWidth; i++)
         {
-            pSrc[0] = *pR;
-            pSrc[1] = *pG;
-            pSrc[2] = *pB;
+            pOut[0] = *pR;
+            pOut[1] = *pG;
+            pOut[2] = *pB;
             pR++;
             pG++;
             pB++;
-            pSrc += 4;
+            pOut += 4;
         }
     }
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
+
     free(rData);
     free(gData);
     free(bData);
-    qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
+    //qDebug() <<"--->"<<__FUNCTION__ <<":"<<__LINE__;
 }
 
 void inline RGBToYCbCr(unsigned char R,unsigned char G,unsigned char B, int &Y, int &Cb, int &Cr)
