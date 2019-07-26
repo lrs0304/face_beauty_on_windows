@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include <QDebug>
 #include <QFileDialog>
+#include <QSlider>
 #include <chrono>
 #include <omp.h>
 
@@ -46,14 +47,19 @@ void MainWindow::initWidgets()
         //loadFileDialog->deleteLater();
     });
 
-    connect(ui->pushButton_2, &QPushButton::clicked, this, [=] {
+    QSlider *slider = new QSlider(this);
+    slider->setGeometry(320, 270, 200, 20);
+    slider->setOrientation(Qt::Horizontal);
+    slider->setMinimum(10);
+    slider->setMaximum(500);
+    connect(slider, &QSlider::valueChanged, this, [=](int value) {
 
         ///////////////////////////////////////////////
         auto beginClock = std::chrono::system_clock::now();
-        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.04f);
+        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, value/10000.0f);
         auto endClock = std::chrono::system_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endClock - beginClock);
-        qDebug("cost time: %.3lf mms", duration.count()/1000.0f);//输出图像处理花费时间信息
+        qDebug("cost time: %.3lf mms", duration.count() / 1000.0f);//输出图像处理花费时间信息
         ///////////////////////////////////////////////
 
         ui->output->setPixmap(QPixmap::fromImage(outImg));
@@ -124,30 +130,36 @@ unsigned char inline CLIP3(int v, int min, int max)
 //Edge Preserved mean filter
 int EPMFilter(unsigned char* srcData, int width, int height, int radius, float delta)
 {
-    float *data = (float*)malloc(sizeof(float) * width * height);
-    float *meanIP = (float*)malloc(sizeof(float) * width * height);
-    float *corrIP = (float*)malloc(sizeof(float) * width * height);
-    for (int i = 0; i < width * height; i++)
+    int size = width*height;
+    float *data = (float*)malloc(sizeof(float) * size);
+    float *meanIP = (float*)malloc(sizeof(float) * size);
+    float *corrIP = (float*)malloc(sizeof(float) * size);
+
+    //使用积分图计算平均值
+    for (int i = 0; i < size; i++)
     {
         data[i] = (float)srcData[i] / 255.0f;
     }
-    //mean and cov compute
     MeanCovMapCalculate(data, width, height, meanIP, radius);
-    for (int i = 0; i < width * height; i++)
+
+    //计算方差
+    for (int i = 0; i < size; i++)
     {
         data[i] *= data[i];
     }
-    //mean and cov compute
     MeanCovMapCalculate(data, width, height, corrIP, radius);
-    for (int i = 0; i < width * height; i++)
+    for (int i = 0; i < size; i++)
     {
         corrIP[i] = corrIP[i] - meanIP[i] * meanIP[i];
     }
-    for (int i = 0; i < width * height; i++)
+
+    //均方差磨皮，暂存到highPass里面，等待处理
+    for (int i = 0; i < size; i++)
     {
         float t = meanIP[i] + (corrIP[i] * (srcData[i] / 255.0f - meanIP[i]) / (corrIP[i] + delta));
-        srcData[i] = (unsigned char)(CLIP3(t * 255.0f, 0, 255));
+        srcData[i] = (uchar)CLIP3(t * 255.0f, 0, 255);
     }
+
     free(data);
     free(meanIP);
     free(corrIP);
