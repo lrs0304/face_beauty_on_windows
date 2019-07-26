@@ -7,8 +7,9 @@
 #include <omp.h>
 #include <math.h>
 
-void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int radius);
-void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta, float light);
+void MeanCovMapCalculate(float *data, int width, int height, float *corrIP, int radius);
+void f_EPMFilter(const uchar *srcData, uchar *dstData, int nWidth, int nHeight, int nStride, int radius, float delta, float light);
+void f_EPMFilterOneChannel(const uchar *srcData, uchar *dstData, int nWidth, int nHeight, int nStride, int radius, float delta, float light);
 
 //参考 https://blog.csdn.net/Trent1985/article/details/80802144#commentsedit
 MainWindow::MainWindow(QWidget *parent) :
@@ -29,23 +30,24 @@ void MainWindow::initWidgets()
 {
     connect(ui->pushButton, &QPushButton::clicked, this, [=] {
 
-        //QFileDialog* loadFileDialog = new QFileDialog(this);
-        //loadFileDialog->setWindowTitle(QString("Select An Picture"));
-        //loadFileDialog->setDirectory("E:/Rison/Pictures");
-        ////设置可以选择多个文件,默认为只能选择一个文件QFileDialog::ExistingFiles
-        ////fileDialog->setFileMode(QFileDialog::ExistingFiles);
-        //loadFileDialog->setNameFilter(tr("Images(*.png *.jpg *.jpeg *.bmp)"));
-        //if(loadFileDialog->exec())
+        QFileDialog* loadFileDialog = new QFileDialog(this);
+        loadFileDialog->setWindowTitle(QString("Select An Picture"));
+        loadFileDialog->setDirectory("E:/Rison/Pictures");
+        //设置可以选择多个文件,默认为只能选择一个文件QFileDialog::ExistingFiles
+        //fileDialog->setFileMode(QFileDialog::ExistingFiles);
+        loadFileDialog->setNameFilter(tr("Images(*.png *.jpg *.jpeg *.bmp)"));
+        if(loadFileDialog->exec())
         {
-            //auto fileNames = loadFileDialog->selectedFiles();
-            srcImg = QImage("E:/Rison/Pictures/fff.png");
+            auto fileNames = loadFileDialog->selectedFiles();
+            srcImg = QImage(fileNames.first());
+            //srcImg = QImage("E:/Rison/Pictures/fff.png");
             outImg = srcImg.copy();
             width = srcImg.width();
             height = srcImg.height();
             qDebug() << "byte count " << srcImg.byteCount();
             ui->input->setPixmap(QPixmap::fromImage(srcImg));
         }
-        //loadFileDialog->deleteLater();
+        loadFileDialog->deleteLater();
     });
 
     QSlider *slider = new QSlider(this);
@@ -56,8 +58,9 @@ void MainWindow::initWidgets()
     connect(slider, &QSlider::valueChanged, this, [=](int value) {
 
         ///////////////////////////////////////////////
+        int radius = qMax(srcImg.width(), srcImg.height())*0.02f;
         auto beginClock = std::chrono::system_clock::now();
-        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.001f,value/10.0f);
+        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, radius, value/10000.0f,1.5f);
         auto endClock = std::chrono::system_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endClock - beginClock);
         qDebug("cost time: %.3lf mms", duration.count() / 1000.0f);//输出图像处理花费时间信息
@@ -134,7 +137,7 @@ float inline light1(float valueDividedBy255, float beta)
 }
 
 //Edge Preserved mean filter
-int EPMFilter(unsigned char* srcData, int width, int height, int radius, float delta, float light)
+int f_EPMFilter(unsigned char* srcData, int width, int height, int radius, float delta, float light)
 {
     int size = width*height;
     float *data = (float*)malloc(sizeof(float) * size);
@@ -211,11 +214,11 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
 #pragma omp parallel sections
     {
 #pragma omp section
-        EPMFilter(rData, nWidth, nHeight, radius, delta, light);
+        f_EPMFilter(rData, nWidth, nHeight, radius, delta, light);
 #pragma omp section
-        EPMFilter(gData, nWidth, nHeight, radius, delta, light);
+        f_EPMFilter(gData, nWidth, nHeight, radius, delta, light);
 #pragma omp section
-        EPMFilter(bData, nWidth, nHeight, radius, delta, light);
+        f_EPMFilter(bData, nWidth, nHeight, radius, delta, light);
     }
 
     uchar* pOut = dstData;
@@ -242,7 +245,7 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
     free(bData);
 }
 
-/*
+
 void inline RGBToYCbCr(unsigned char R, unsigned char G, unsigned char B, int &Y, int &Cb, int &Cr)
 {
     Y = (unsigned char)(0.257*R + 0.564*G + 0.098*B + 16);
@@ -258,7 +261,7 @@ void inline YCbCrToRGB(unsigned char Y, unsigned char Cb, unsigned char Cr, int 
 }
 
 //只处理Y通道
-void f_EPMFilterOneChannel(unsigned char* srcData, int nWidth, int nHeight, int nStride, int radius, float delta)
+void f_EPMFilterOneChannel(const uchar *srcData, uchar *outData, int nWidth, int nHeight, int nStride, int radius, float delta, float light)
 {
     if (srcData == NULL)
     {
@@ -267,16 +270,16 @@ void f_EPMFilterOneChannel(unsigned char* srcData, int nWidth, int nHeight, int 
     unsigned char* yData = (unsigned char*)malloc(sizeof(unsigned char) * nWidth * nHeight);
     unsigned char* cbData = (unsigned char*)malloc(sizeof(unsigned char) * nWidth * nHeight);
     unsigned char* crData = (unsigned char*)malloc(sizeof(unsigned char) * nWidth * nHeight);
-    unsigned char* pSrc = srcData;
+    const uchar* pSrc = srcData;
     int Y, CB, CR;
     unsigned char* pY = yData;
     unsigned char* pCb = cbData;
     unsigned char* pCr = crData;
-    for(int j = 0; j < nHeight; j++)
+    for (int j = 0; j < nHeight; j++)
     {
-        for(int i = 0; i < nWidth; i++)
+        for (int i = 0; i < nWidth; i++)
         {
-            RGBToYCbCr(pSrc[2],pSrc[1],pSrc[0], Y, CB, CR);
+            RGBToYCbCr(pSrc[0], pSrc[1], pSrc[2], Y, CB, CR);
             *pY = Y;
             *pCb = CB;
             *pCr = CR;
@@ -286,25 +289,26 @@ void f_EPMFilterOneChannel(unsigned char* srcData, int nWidth, int nHeight, int 
             pSrc += 4;
         }
     }
-    EPMFilter(yData, nWidth, nHeight, radius, delta);
-    pSrc = srcData;
+    f_EPMFilter(yData, nWidth, nHeight, radius, delta, light);
+
+    uchar* pOut = outData;
     pY = yData;
     pCb = cbData;
     pCr = crData;
     int R, G, B;
-    for(int j = 0; j < nHeight; j++)
+    for (int j = 0; j < nHeight; j++)
     {
-        for(int i = 0; i < nWidth; i++)
+        for (int i = 0; i < nWidth; i++)
         {
             YCbCrToRGB(*pY, *pCb, *pCr, R, G, B);
-            pSrc[0] = B;
-            pSrc[1] = G;
-            pSrc[2] = R;
+            pOut[0] = R;
+            pOut[1] = G;
+            pOut[2] = B;
             pY++;
             pCb++;
             pCr++;
-            pSrc += 4;
+            pOut += 4;
         }
-    }free(yData);free(cbData);free(crData);
+    }
+    free(yData); free(cbData); free(crData);
 }
-*/
