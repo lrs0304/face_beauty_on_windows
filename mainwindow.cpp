@@ -5,9 +5,10 @@
 #include <QSlider>
 #include <chrono>
 #include <omp.h>
+#include <math.h>
 
 void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int radius);
-void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta);
+void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta, float light);
 
 //参考 https://blog.csdn.net/Trent1985/article/details/80802144#commentsedit
 MainWindow::MainWindow(QWidget *parent) :
@@ -51,12 +52,12 @@ void MainWindow::initWidgets()
     slider->setGeometry(320, 270, 200, 20);
     slider->setOrientation(Qt::Horizontal);
     slider->setMinimum(10);
-    slider->setMaximum(500);
+    slider->setMaximum(90);
     connect(slider, &QSlider::valueChanged, this, [=](int value) {
 
         ///////////////////////////////////////////////
         auto beginClock = std::chrono::system_clock::now();
-        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, value/10000.0f);
+        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.000f,value/10.0f);
         auto endClock = std::chrono::system_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endClock - beginClock);
         qDebug("cost time: %.3lf mms", duration.count() / 1000.0f);//输出图像处理花费时间信息
@@ -127,8 +128,13 @@ unsigned char inline CLIP3(int v, int min, int max)
     else return v;
 }
 
+float inline light1(float valueDividedBy255, float beta)
+{
+    return log(valueDividedBy255*(beta - 1) + 1) / log(beta);
+}
+
 //Edge Preserved mean filter
-int EPMFilter(unsigned char* srcData, int width, int height, int radius, float delta)
+int EPMFilter(unsigned char* srcData, int width, int height, int radius, float delta, float light)
 {
     int size = width*height;
     float *data = (float*)malloc(sizeof(float) * size);
@@ -141,6 +147,12 @@ int EPMFilter(unsigned char* srcData, int width, int height, int radius, float d
         data[i] = (float)srcData[i] / 255.0f;
     }
     MeanCovMapCalculate(data, width, height, meanI, radius);
+    
+    //曲线美白
+    for (int i = 0; i < size; i++)
+    {
+        srcData[i] = (uchar)CLIP3(light1(data[i], light) * 255.0f, 0, 255);
+    }
 
     //计算方差
     for (int i = 0; i < size; i++)
@@ -167,7 +179,7 @@ int EPMFilter(unsigned char* srcData, int width, int height, int radius, float d
 }
 
 //3通道处理
-void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta)
+void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta, float light)
 {
     Q_UNUSED(nStride);
     if (srcData == nullptr) { return; }
@@ -199,11 +211,11 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
 #pragma omp parallel sections
     {
 #pragma omp section
-        EPMFilter(rData, nWidth, nHeight, radius, delta);
+        EPMFilter(rData, nWidth, nHeight, radius, delta, light);
 #pragma omp section
-        EPMFilter(gData, nWidth, nHeight, radius, delta);
+        EPMFilter(gData, nWidth, nHeight, radius, delta, light);
 #pragma omp section
-        EPMFilter(bData, nWidth, nHeight, radius, delta);
+        EPMFilter(bData, nWidth, nHeight, radius, delta, light);
     }
 
     uchar* pOut = dstData;
@@ -230,6 +242,7 @@ void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, 
     free(bData);
 }
 
+/*
 void inline RGBToYCbCr(unsigned char R, unsigned char G, unsigned char B, int &Y, int &Cb, int &Cr)
 {
     Y = (unsigned char)(0.257*R + 0.564*G + 0.098*B + 16);
@@ -294,3 +307,4 @@ void f_EPMFilterOneChannel(unsigned char* srcData, int nWidth, int nHeight, int 
         }
     }free(yData);free(cbData);free(crData);
 }
+*/
