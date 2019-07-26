@@ -132,37 +132,37 @@ int EPMFilter(unsigned char* srcData, int width, int height, int radius, float d
 {
     int size = width*height;
     float *data = (float*)malloc(sizeof(float) * size);
-    float *meanIP = (float*)malloc(sizeof(float) * size);
-    float *corrIP = (float*)malloc(sizeof(float) * size);
+    float *meanI = (float*)malloc(sizeof(float) * size);
+    float *corrI = (float*)malloc(sizeof(float) * size);
 
     //使用积分图计算平均值
     for (int i = 0; i < size; i++)
     {
         data[i] = (float)srcData[i] / 255.0f;
     }
-    MeanCovMapCalculate(data, width, height, meanIP, radius);
+    MeanCovMapCalculate(data, width, height, meanI, radius);
 
     //计算方差
     for (int i = 0; i < size; i++)
     {
         data[i] *= data[i];
     }
-    MeanCovMapCalculate(data, width, height, corrIP, radius);
+    MeanCovMapCalculate(data, width, height, corrI, radius);
     for (int i = 0; i < size; i++)
     {
-        corrIP[i] = corrIP[i] - meanIP[i] * meanIP[i];
+        corrI[i] = corrI[i] - meanI[i] * meanI[i];
     }
 
     //均方差磨皮，暂存到highPass里面，等待处理
     for (int i = 0; i < size; i++)
     {
-        float t = meanIP[i] + (corrIP[i] * (srcData[i] / 255.0f - meanIP[i]) / (corrIP[i] + delta));
+        float t = meanI[i] + (corrI[i] * (srcData[i] / 255.0f - meanI[i]) / (corrI[i] + delta));
         srcData[i] = (uchar)CLIP3(t * 255.0f, 0, 255);
     }
 
     free(data);
-    free(meanIP);
-    free(corrIP);
+    free(meanI);
+    free(corrI);
     return 0;
 }
 
@@ -170,7 +170,7 @@ int EPMFilter(unsigned char* srcData, int width, int height, int radius, float d
 void f_EPMFilter(const uchar* srcData, uchar* dstData, int nWidth, int nHeight, int nStride, int radius, float delta)
 {
     Q_UNUSED(nStride);
-    if (srcData == NULL) { return; }
+    if (srcData == nullptr) { return; }
 
     int64_t rBytesCount = sizeof(uchar) * nWidth * nHeight;
     uchar* rData = (uchar*)malloc(rBytesCount);
