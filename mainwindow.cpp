@@ -38,7 +38,7 @@ void MainWindow::initWidgets()
         //if(loadFileDialog->exec())
         {
             //auto fileNames = loadFileDialog->selectedFiles();
-            srcImg = QImage("E:/Rison/Pictures/ddd.png");
+            srcImg = QImage("E:/Rison/Pictures/fff.png");
             outImg = srcImg.copy();
             width = srcImg.width();
             height = srcImg.height();
@@ -51,13 +51,13 @@ void MainWindow::initWidgets()
     QSlider *slider = new QSlider(this);
     slider->setGeometry(320, 270, 200, 20);
     slider->setOrientation(Qt::Horizontal);
-    slider->setMinimum(10);
-    slider->setMaximum(90);
+    slider->setMinimum(15);
+    slider->setMaximum(50);
     connect(slider, &QSlider::valueChanged, this, [=](int value) {
 
         ///////////////////////////////////////////////
         auto beginClock = std::chrono::system_clock::now();
-        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.000f,value/10.0f);
+        f_EPMFilter(srcImg.bits(), outImg.bits(), width, height, width, 10, 0.001f,value/10.0f);
         auto endClock = std::chrono::system_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endClock - beginClock);
         qDebug("cost time: %.3lf mms", duration.count() / 1000.0f);//输出图像处理花费时间信息
@@ -123,7 +123,7 @@ void MeanCovMapCalculate(float*data, int width, int height, float *corrIP, int r
 
 unsigned char inline CLIP3(int v, int min, int max)
 {
-    if (v < min) { return v; }
+    if (v < min) { return min; }
     else if (v > max) { return max; }
     else return v;
 }
@@ -147,7 +147,7 @@ int EPMFilter(unsigned char* srcData, int width, int height, int radius, float d
         data[i] = (float)srcData[i] / 255.0f;
     }
     MeanCovMapCalculate(data, width, height, meanI, radius);
-    
+
     //曲线美白
     for (int i = 0; i < size; i++)
     {
